@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Transit AI - ETA & Delay Predictor</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="text-slate-100 flex flex-col min-h-screen">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+          <i class="fa-solid fa-train-subway text-white text-lg"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-lg font-bold tracking-tight text-white">TRANSIT<span class="text-cyan-400">ETA</span></h1>
+            <span class="px-2 py-0.5 text-[10px] font-semibold bg-cyan-500/10 text-cyan-400 rounded-full border border-cyan-500/30">AI OPS</span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">Random Forest Transit ETA & Delay Prediction Engine</p>
+        </div>
+      </div>
+
+      <!-- System status -->
+      <div class="flex items-center space-x-4">
+        <div class="hidden md:flex items-center space-x-2 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 radar-dot"></span>
+          <span class="text-xs text-slate-300 font-mono">100 TREES ACTIVE</span>
+        </div>
+        <div class="hidden sm:block text-right text-xs">
+          <div class="text-slate-400">Model Framework</div>
+          <div class="font-mono text-cyan-400">RandomForestRegressor</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 w-full">
+    <nav class="flex space-x-2 border-b border-slate-800 pb-2 overflow-x-auto">
+      <button data-target="tab-predict" class="nav-tab active px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 border border-transparent">
+        <i class="fa-solid fa-sliders text-cyan-400"></i> Live ETA Predictor
+      </button>
+      <button data-target="tab-batch" class="nav-tab px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 border border-transparent text-slate-400 hover:text-slate-200">
+        <i class="fa-solid fa-file-csv text-blue-400"></i> Batch CSV Testing
+      </button>
+      <button data-target="tab-analytics" class="nav-tab px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 border border-transparent text-slate-400 hover:text-slate-200">
+        <i class="fa-solid fa-chart-pie text-emerald-400"></i> Model Insights
+      </button>
+      <button data-target="tab-api" class="nav-tab px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 border border-transparent text-slate-400 hover:text-slate-200">
+        <i class="fa-solid fa-code text-amber-400"></i> API Docs
+      </button>
+    </nav>
+  </div>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-grow">
+
+    <!-- TAB 1: LIVE ETA PREDICTOR -->
+    <div id="tab-predict" class="tab-content">
+      <!-- Quick Scenarios Presets -->
+      <div class="mb-6">
+        <div class="flex items-center justify-between mb-2.5">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+            <i class="fa-solid fa-bolt text-cyan-400"></i> Quick Scenario Presets
+          </span>
+          <span class="text-xs text-slate-500">1-click simulation scenarios</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
+          <button onclick="loadScenario('express')" class="glass-card p-2.5 rounded-xl text-left hover:border-cyan-400/60 flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-train"></i>
+            </div>
+            <div>
+              <div class="text-xs font-bold text-white">Express Run</div>
+              <div class="text-[10px] text-slate-400">420km @ 115 km/h</div>
+            </div>
+          </button>
+
+          <button onclick="loadScenario('monsoon')" class="glass-card p-2.5 rounded-xl text-left hover:border-blue-400/60 flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-cloud-showers-heavy"></i>
+            </div>
+            <div>
+              <div class="text-xs font-bold text-white">Monsoon Delay</div>
+              <div class="text-[10px] text-slate-400">Rain + Congestion 4</div>
+            </div>
+          </button>
+
+          <button onclick="loadScenario('stationHalt')" class="glass-card p-2.5 rounded-xl text-left hover:border-red-400/60 flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-hand"></i>
+            </div>
+            <div>
+              <div class="text-xs font-bold text-white">Signal Halt</div>
+              <div class="text-[10px] text-slate-400">0 km/h, Bottleneck</div>
+            </div>
+          </button>
+
+          <button onclick="loadScenario('fog')" class="glass-card p-2.5 rounded-xl text-left hover:border-amber-400/60 flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-smog"></i>
+            </div>
+            <div>
+              <div class="text-xs font-bold text-white">Dense Fog Run</div>
+              <div class="text-[10px] text-slate-400">Low speed & storm</div>
+            </div>
+          </button>
+
+          <button onclick="loadScenario('terminal')" class="glass-card p-2.5 rounded-xl text-left hover:border-emerald-400/60 flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-flag-checkered"></i>
+            </div>
+            <div>
+              <div class="text-xs font-bold text-white">Approaching</div>
+              <div class="text-[10px] text-slate-400">28km to station</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Predictor Main Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Left Controls: 7 cols -->
+        <div class="lg:col-span-7 space-y-5">
+          <div class="glass-card p-6 rounded-2xl">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-5">
+              <h2 class="text-base font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-sliders text-cyan-400"></i> Transit Parameters
+              </h2>
+              <div id="haltStatusBadge">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-900/60 text-emerald-300 border border-emerald-500/40">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5"></span>IN TRANSIT (MOVING)
+                </span>
+              </div>
+            </div>
+
+            <!-- Parameter 1: Distance Remaining -->
+            <div class="mb-6">
+              <div class="flex items-center justify-between mb-2">
+                <label for="distSlider" class="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                  <i class="fa-solid fa-route text-cyan-400"></i> Remaining Distance
+                </label>
+                <div class="flex items-center gap-1.5">
+                  <input type="number" id="distInput" value="190.4" step="0.5" min="1" max="500" class="w-24 px-2.5 py-1 bg-slate-900/90 border border-slate-700 rounded-lg text-sm text-right font-mono text-cyan-400 focus:outline-none focus:border-cyan-500">
+                  <span class="text-xs text-slate-400">km</span>
+                </div>
+              </div>
+              <input type="range" id="distSlider" min="1" max="500" step="0.5" value="190.4">
+              <div class="flex justify-between text-[10px] text-slate-500 mt-1 font-mono">
+                <span>1 km (Near)</span>
+                <span>250 km</span>
+                <span>500 km (Long-haul)</span>
+              </div>
+            </div>
+
+            <!-- Parameter 2: Current Speed -->
+            <div class="mb-6">
+              <div class="flex items-center justify-between mb-2">
+                <label for="speedSlider" class="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                  <i class="fa-solid fa-gauge-high text-blue-400"></i> Current Vehicle / Train Speed
+                </label>
+                <div class="flex items-center gap-1.5">
+                  <input type="number" id="speedInput" value="65.0" step="0.5" min="0" max="140" class="w-24 px-2.5 py-1 bg-slate-900/90 border border-slate-700 rounded-lg text-sm text-right font-mono text-blue-400 focus:outline-none focus:border-blue-500">
+                  <span class="text-xs text-slate-400">km/h</span>
+                </div>
+              </div>
+              <input type="range" id="speedSlider" min="0" max="140" step="0.5" value="65">
+              <div class="flex justify-between text-[10px] text-slate-500 mt-1 font-mono">
+                <span>0 km/h (Stopped)</span>
+                <span>70 km/h</span>
+                <span>140 km/h (Max)</span>
+              </div>
+            </div>
+
+            <!-- Parameter 3: Congestion Score -->
+            <div class="mb-6">
+              <label class="text-sm font-semibold text-slate-300 flex items-center gap-2 mb-2">
+                <i class="fa-solid fa-traffic-light text-amber-400"></i> Route / Track Congestion Level (0-5)
+              </label>
+              <div class="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                <label class="congestion-card cursor-pointer p-2 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-center transition">
+                  <input type="radio" name="congestion" value="0" class="hidden">
+                  <div class="text-xs font-bold text-emerald-400">Level 0</div>
+                  <div class="text-[10px] text-slate-400">Clear Track</div>
+                </label>
+                <label class="congestion-card cursor-pointer p-2 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-center transition">
+                  <input type="radio" name="congestion" value="1" class="hidden">
+                  <div class="text-xs font-bold text-teal-400">Level 1</div>
+                  <div class="text-[10px] text-slate-400">Low Traffic</div>
+                </label>
+                <label class="congestion-card cursor-pointer p-2 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-center transition">
+                  <input type="radio" name="congestion" value="2" class="hidden">
+                  <div class="text-xs font-bold text-cyan-400">Level 2</div>
+                  <div class="text-[10px] text-slate-400">Moderate</div>
+                </label>
+                <label class="congestion-card cursor-pointer p-2 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-center transition">
+                  <input type="radio" name="congestion" value="3" class="hidden">
+                  <div class="text-xs font-bold text-amber-400">Level 3</div>
+                  <div class="text-[10px] text-slate-400">Heavy</div>
+                </label>
+                <label class="congestion-card cursor-pointer p-2 rounded-xl border border-slate-800 bg-slate-900/60 ring-2 ring-cyan-400 bg-cyan-950/40 hover:bg-slate-800 text-center transition">
+                  <input type="radio" name="congestion" value="4" checked class="hidden">
+                  <div class="text-xs font-bold text-orange-400">Level 4</div>
+                  <div class="text-[10px] text-slate-400">Severe</div>
+                </label>
+                <label class="congestion-card cursor-pointer p-2 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-center transition">
+                  <input type="radio" name="congestion" value="5" class="hidden">
+                  <div class="text-xs font-bold text-red-400">Level 5</div>
+                  <div class="text-[10px] text-slate-400">Gridlock</div>
+                </label>
+              </div>
+            </div>
+
+            <!-- Parameter 4 & 5: Weather & Movement Switch -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <!-- Weather -->
+              <div>
+                <label class="text-sm font-semibold text-slate-300 flex items-center gap-2 mb-2">
+                  <i class="fa-solid fa-cloud-sun text-indigo-400"></i> Weather Condition
+                </label>
+                <div class="grid grid-cols-3 gap-2">
+                  <label class="weather-card cursor-pointer p-2 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-center transition">
+                    <input type="radio" name="weather" value="0" class="hidden">
+                    <i class="fa-solid fa-sun text-amber-400 text-sm mb-1 block"></i>
+                    <div class="text-xs font-semibold">0: Clear</div>
+                  </label>
+                  <label class="weather-card cursor-pointer p-2 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-center transition">
+                    <input type="radio" name="weather" value="1" class="hidden">
+                    <i class="fa-solid fa-cloud-rain text-blue-400 text-sm mb-1 block"></i>
+                    <div class="text-xs font-semibold">1: Rain</div>
+                  </label>
+                  <label class="weather-card cursor-pointer p-2 rounded-xl border border-slate-800 bg-slate-900/60 ring-2 ring-cyan-400 bg-cyan-950/40 hover:bg-slate-800 text-center transition">
+                    <input type="radio" name="weather" value="2" checked class="hidden">
+                    <i class="fa-solid fa-cloud-bolt text-purple-400 text-sm mb-1 block"></i>
+                    <div class="text-xs font-semibold">2: Storm</div>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Movement Toggle -->
+              <div>
+                <label class="text-sm font-semibold text-slate-300 flex items-center gap-2 mb-2">
+                  <i class="fa-solid fa-circle-stop text-rose-400"></i> Movement Status
+                </label>
+                <div class="p-2.5 rounded-xl border border-slate-800 bg-slate-900/60 flex items-center justify-between h-[66px]">
+                  <div>
+                    <div class="text-xs font-semibold text-white">Vehicle Halted?</div>
+                    <div class="text-[10px] text-slate-400">Stopped at station/signal</div>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="haltedToggle" class="sr-only peer">
+                    <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-500"></div>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between">
+              <span class="text-xs text-slate-400">
+                <i class="fa-solid fa-arrows-rotate mr-1 text-cyan-400"></i> Real-time calculation on input change
+              </span>
+              <button onclick="runPrediction()" class="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold text-sm shadow-lg shadow-cyan-500/25 flex items-center gap-2 transition">
+                <i class="fa-solid fa-calculator"></i> Calculate ETA
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Output Dashboard: 5 cols -->
+        <div class="lg:col-span-5 space-y-5">
+          <!-- Main Output Card -->
+          <div class="glass-card p-6 rounded-2xl relative overflow-hidden border border-cyan-500/40">
+            <div class="absolute -right-10 -top-10 w-40 h-40 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="flex items-center justify-between mb-4">
+              <span class="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-2">
+                <i class="fa-solid fa-clock-rotate-left"></i> Predicted ETA
+              </span>
+              <span id="resFormattedEta" class="text-sm font-bold text-slate-300 font-mono bg-slate-900/80 px-2.5 py-1 rounded-lg border border-slate-800">--</span>
+            </div>
+
+            <!-- Big number display -->
+            <div class="mb-4">
+              <div class="flex items-baseline gap-2">
+                <span id="resEtaMinutes" class="text-5xl font-extrabold tracking-tight text-white font-mono glow-cyan">--</span>
+                <span class="text-lg font-semibold text-slate-400">minutes remaining</span>
+              </div>
+            </div>
+
+            <!-- Clock Arrival Prediction -->
+            <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800/90 mb-4 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                  <i class="fa-regular fa-clock text-lg"></i>
+                </div>
+                <div>
+                  <div class="text-xs text-slate-400">Estimated Destination Clock Arrival</div>
+                  <div id="resClockArrival" class="text-lg font-bold text-white font-mono">--:--</div>
+                </div>
+              </div>
+              <div id="resArrivalDate" class="text-xs font-mono text-slate-400 text-right">--</div>
+            </div>
+
+            <!-- Uncertainty / Confidence -->
+            <div class="space-y-2 mb-4">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-400">Prediction Confidence</span>
+                <span id="resConfidenceScore" class="font-bold text-emerald-400 font-mono">--%</span>
+              </div>
+              <div class="w-full h-2 bg-slate-900 rounded-full overflow-hidden">
+                <div id="resConfidenceBar" class="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-300" style="width: 80%"></div>
+              </div>
+              <div class="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                <span>95% CI Range: <strong id="resCiRange" class="text-slate-200">--</strong></span>
+                <span id="resStdDev" class="text-slate-400">± -- mins</span>
+              </div>
+            </div>
+
+            <!-- Speedometer Display -->
+            <div class="pt-3 border-t border-slate-800/80 flex flex-col items-center">
+              <canvas id="speedGauge" width="220" height="110"></canvas>
+              <div class="flex justify-between w-full text-xs px-2 text-slate-400 mt-1">
+                <div>Theoretical (Free-Flow): <span id="resIdealMinutes" class="font-mono text-slate-300 font-bold">--</span></div>
+                <div class="text-amber-400 font-bold" id="resDelayMinutes">+-- mins delay</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tree Ensemble Vote Histogram -->
+          <div class="glass-card p-5 rounded-2xl">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                <i class="fa-solid fa-chart-simple text-cyan-400"></i> 100 Trees Ensemble Vote Spread
+              </h3>
+              <span class="text-[10px] text-slate-400">Decision consensus</span>
+            </div>
+            <div class="h-36 w-full">
+              <canvas id="treeVoteChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- TAB 2: BATCH CSV TESTING -->
+    <div id="tab-batch" class="tab-content hidden space-y-6">
+      <div class="glass-card p-6 rounded-2xl">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4 mb-6">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-file-csv text-blue-400"></i> Batch Transit Dataset Testing & Validation
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">Upload a CSV file or load 30 benchmark samples from the attached 15,000-row dataset</p>
+          </div>
+          <div class="flex items-center gap-2.5">
+            <button onclick="loadSampleBatch()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-400 rounded-xl text-xs font-bold border border-cyan-500/30 flex items-center gap-2 transition">
+              <i class="fa-solid fa-vial"></i> Load Dataset Samples
+            </button>
+            <button onclick="downloadBatchCSV()" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-2 transition">
+              <i class="fa-solid fa-download"></i> Export Predictions
+            </button>
+          </div>
+        </div>
+
+        <!-- Dropzone -->
+        <div id="dropZone" class="border-2 border-dashed border-slate-700 hover:border-cyan-500/80 rounded-xl p-6 text-center cursor-pointer transition bg-slate-900/40 mb-6">
+          <input type="file" id="csvFileInput" accept=".csv" class="hidden">
+          <div class="w-12 h-12 rounded-full bg-cyan-500/10 text-cyan-400 flex items-center justify-center mx-auto mb-2">
+            <i class="fa-solid fa-cloud-arrow-up text-xl"></i>
+          </div>
+          <div class="text-sm font-semibold text-white">Click or drag & drop a CSV file to predict</div>
+          <p class="text-xs text-slate-400 mt-1">Accepts headers: <code class="text-cyan-400">remaining_km, current_speed_kmh, congestion_score, weather_encoded, is_halted</code> (and optional <code class="text-cyan-400">target_remaining_minutes</code>)</p>
+        </div>
+
+        <!-- Loading spinner -->
+        <div id="batchLoading" class="hidden py-6 text-center">
+          <i class="fa-solid fa-circle-notch fa-spin text-3xl text-cyan-400"></i>
+          <p class="text-xs text-slate-400 mt-2">Computing ensemble predictions across Random Forest trees...</p>
+        </div>
+
+        <!-- Metrics panel (shown when target values exist) -->
+        <div id="batchMetricsPanel" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"></div>
+
+        <!-- Search input -->
+        <div class="flex items-center justify-between mb-3">
+          <div class="relative w-72">
+            <i class="fa-solid fa-search absolute left-3 top-2.5 text-xs text-slate-500"></i>
+            <input type="text" id="batchSearch" placeholder="Filter rows..." class="w-full pl-8 pr-3 py-1.5 bg-slate-900/80 border border-slate-800 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+          </div>
+        </div>
+
+        <!-- Results Table -->
+        <div class="overflow-x-auto rounded-xl border border-slate-800/80 bg-slate-950/40">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-900/90 text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                <th class="py-3 px-3">#</th>
+                <th class="py-3 px-3">Remaining Dist</th>
+                <th class="py-3 px-3">Current Speed</th>
+                <th class="py-3 px-3">Congestion</th>
+                <th class="py-3 px-3">Weather</th>
+                <th class="py-3 px-3">Status</th>
+                <th class="py-3 px-3">Predicted ETA</th>
+                <th class="py-3 px-3">Ground Truth (Error)</th>
+              </tr>
+            </thead>
+            <tbody id="batchTableBody" class="divide-y divide-slate-800/60">
+              <tr>
+                <td colspan="8" class="py-8 text-center text-slate-400 text-sm">
+                  Click "Load Dataset Samples" or upload your CSV to see real-time batch predictions.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div id="batchPagination" class="mt-4 flex items-center justify-between"></div>
+      </div>
+    </div>
+
+    <!-- TAB 3: MODEL INSIGHTS & EXPLAINABILITY -->
+    <div id="tab-analytics" class="tab-content hidden space-y-6">
+      <!-- Dataset Stats Cards -->
+      <div id="datasetStatsCards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"></div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Feature Importance: 7 cols -->
+        <div class="lg:col-span-7 glass-card p-6 rounded-2xl">
+          <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-chart-column text-emerald-400"></i> Mean Decrease in Impurity (MDI) Importance
+            </h3>
+            <span class="text-xs text-slate-400">Random Forest Feature Impact</span>
+          </div>
+          <p class="text-xs text-slate-400 mb-4">
+            Measures the relative contribution of each parameter to predicting arrival time across all 100 decision trees.
+          </p>
+          <div class="h-64 w-full">
+            <canvas id="featureImportanceChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Architecture Specs: 5 cols -->
+        <div class="lg:col-span-5 glass-card p-6 rounded-2xl">
+          <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-microchip text-cyan-400"></i> Model Architecture
+            </h3>
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">Scikit-Learn 1.6</span>
+          </div>
+
+          <div class="space-y-3 text-sm">
+            <div class="flex justify-between py-2 border-b border-slate-800/80">
+              <span class="text-slate-400">Algorithm</span>
+              <span class="font-semibold text-white font-mono">RandomForestRegressor</span>
+            </div>
+            <div class="flex justify-between py-2 border-b border-slate-800/80">
+              <span class="text-slate-400">Number of Estimators</span>
+              <span id="metaEstimators" class="font-semibold text-cyan-400 font-mono">100 Trees</span>
+            </div>
+            <div class="flex justify-between py-2 border-b border-slate-800/80">
+              <span class="text-slate-400">Max Depth</span>
+              <span id="metaDepth" class="font-semibold text-white font-mono">12 Levels</span>
+            </div>
+            <div class="flex justify-between py-2 border-b border-slate-800/80">
+              <span class="text-slate-400">Training Samples</span>
+              <span id="metaSamples" class="font-semibold text-white font-mono">12,000 observations</span>
+            </div>
+            <div class="flex justify-between py-2 border-b border-slate-800/80">
+              <span class="text-slate-400">Active Features</span>
+              <span id="metaFeatures" class="font-semibold text-white font-mono">5 Features</span>
+            </div>
+            <div class="flex justify-between py-2">
+              <span class="text-slate-400">Execution Runtime</span>
+              <span class="font-semibold text-emerald-400 font-mono">&lt; 4 ms (NumPy Engine)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: API DOCUMENTATION -->
+    <div id="tab-api" class="tab-content hidden space-y-6">
+      <div class="glass-card p-6 rounded-2xl">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2 mb-2">
+          <i class="fa-solid fa-code text-amber-400"></i> REST API Integration Guide
+        </h2>
+        <p class="text-xs text-slate-400 mb-6">Integrate this model directly into any mobile app, dispatch server, or automated monitoring pipeline.</p>
+
+        <!-- POST /api/predict -->
+        <div class="mb-6">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="px-2 py-0.5 text-xs font-bold bg-emerald-500/20 text-emerald-400 rounded border border-emerald-500/40">POST</span>
+            <code class="text-sm font-mono text-cyan-400">/api/predict</code>
+            <span class="text-xs text-slate-400">— Single prediction endpoint</span>
+          </div>
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono text-xs overflow-x-auto">
+            <span class="text-slate-500"># Example cURL request</span><br>
+            curl -X POST http://localhost:5000/api/predict \<br>
+            &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
+            &nbsp;&nbsp;-d '{"remaining_km": 190.4, "current_speed_kmh": 65.0, "congestion_score": 4, "weather_encoded": 2, "is_halted": 0}'
+          </div>
+        </div>
+
+        <!-- Response -->
+        <div>
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">Example JSON Response</span>
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono text-xs text-emerald-400 overflow-x-auto">
+{
+  "status": "success",
+  "data": {
+    "predicted_remaining_minutes": 197.7,
+    "formatted_eta": "3h 18m",
+    "estimated_arrival_clock": "09:45 PM",
+    "confidence_score": 94.2,
+    "std_deviation": 8.15,
+    "ci_95": { "lower": 181.72, "upper": 213.68 },
+    "theoretical_minutes": 175.75,
+    "delay_minutes": 21.95
+  }
+}
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800/80 bg-slate-950/60 py-4 mt-auto text-xs text-slate-500 text-center">
+    Transit ETA AI &bull; Smart India Hackathon &bull; Powered by Random Forest Ensemble
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
