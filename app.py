@@ -1,29 +1,67 @@
-import os
+﻿import os
 import io
 import csv
 import json
 import math
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, jsonify, send_file, Response
+from functools import wraps
+from flask import Flask, render_template, request, jsonify, redirect, session, url_for
+from werkzeug.security import check_password_hash
 from model_engine import ETAPredictorEngine
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max
+secret_key = os.environ.get('SECRET_KEY')
+if not secret_key:
+    raise RuntimeError('SECRET_KEY environment variable must be set before starting the app.')
+app.config.update(SECRET_KEY=secret_key, SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Lax', SESSION_COOKIE_SECURE=os.environ.get('RENDER', '').lower() == 'true')
 
 # Initialize prediction engine
 engine = ETAPredictorEngine('eta_predictor_model.pkl')
 DATASET_PATH = 'eta_dataset.csv'
 
+def login_required(view):
+    @wraps(view)
+    def wrapped_view(*args, **kwargs):
+        if 'user' in session:
+            return view(*args, **kwargs)
+        if request.path.startswith('/api/'):
+            return jsonify({'status': 'error', 'message': 'Authentication required'}), 401
+        return redirect(url_for('login'))
+    return wrapped_view
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if 'user' in session:
+        return redirect(url_for('index'))
+    if request.method == 'POST':
+        username = request.form.get('username', '')
+        password = request.form.get('password', '')
+        if username == os.environ.get('ADMIN_USERNAME') and check_password_hash(os.environ.get('ADMIN_PASSWORD_HASH', ''), password):
+            session.clear()
+            session['user'] = username
+            return redirect(url_for('index'))
+        return render_template('login.html', error='Invalid username or password.'), 401
+    return render_template('login.html')
+
+@app.post('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
 @app.route('/')
+@login_required
 def index():
     return render_template('index.html')
 
 @app.route('/api/model-info', methods=['GET'])
+@login_required
 def model_info():
     info = engine.get_model_info()
     return jsonify({'status': 'success', 'data': info})
 
 @app.route('/api/predict', methods=['POST'])
+@login_required
 def predict():
     try:
         data = request.get_json(force=True)
@@ -53,6 +91,7 @@ def predict():
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @app.route('/api/predict-batch', methods=['POST'])
+@login_required
 def predict_batch():
     try:
         rows = []
@@ -141,6 +180,7 @@ def predict_batch():
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @app.route('/api/sample-data', methods=['GET'])
+@login_required
 def sample_data():
     samples = []
     if os.path.exists(DATASET_PATH):
@@ -162,6 +202,7 @@ def sample_data():
     return jsonify({'status': 'success', 'samples': samples})
 
 @app.route('/api/dataset-stats', methods=['GET'])
+@login_required
 def dataset_stats():
     stats = {}
     if os.path.exists(DATASET_PATH):
@@ -197,4 +238,4 @@ def dataset_stats():
 
 if __name__ == '__main__':
     print('Starting ETA Predictor Server on http://127.0.0.1:5000')
-    app.run(host='127.0.0.1', port=5000, debug=True)
+    app.run(host='127.0.0.1', port=5000, debug=False)
