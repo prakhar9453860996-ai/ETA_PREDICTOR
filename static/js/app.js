@@ -70,6 +70,13 @@ function initControls() {
         const val = parseFloat(e.target.value);
         speedSlider.value = val;
         drawSpeedGauge(val);
+        if (val === 0) {
+            haltedToggle.checked = true;
+            updateHaltState(true);
+        } else if (haltedToggle.checked) {
+            haltedToggle.checked = false;
+            updateHaltState(false);
+        }
         debouncePredict();
     });
 
@@ -235,7 +242,16 @@ function displayPrediction(data) {
     document.getElementById('resStdDev').textContent = `± ${data.std_deviation} mins (tree dispersion)`;
 
     document.getElementById('resIdealMinutes').textContent = `${data.theoretical_minutes} mins`;
-    document.getElementById('resDelayMinutes').textContent = `+${data.delay_minutes} mins delay`;
+    const delayEl = document.getElementById('resDelayMinutes');
+    if (delayEl) {
+        if (data.delay_minutes > 0.5) {
+            delayEl.textContent = `+${data.delay_minutes} mins delay`;
+            delayEl.className = 'text-amber-400 font-bold';
+        } else {
+            delayEl.textContent = 'On Schedule (0m delay)';
+            delayEl.className = 'text-emerald-400 font-bold';
+        }
+    }
 
     renderTreeChart(data.tree_distribution, data.predicted_remaining_minutes);
 }

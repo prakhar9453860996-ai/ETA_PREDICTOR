@@ -108,9 +108,11 @@ class ETAPredictorEngine:
         ci_lower = max(0.0, float(round(mean_pred - 1.96 * std_pred, 2)))
         ci_upper = float(round(mean_pred + 1.96 * std_pred, 2))
 
-        effective_speed = max(float(current_speed_kmh), 1.0)
-        theoretical_minutes = (float(remaining_km) / effective_speed) * 60.0
-        delay_minutes = max(0.0, mean_pred - theoretical_minutes)
+        # Baseline free-flow ideal conditions: Clear track (0), clear weather (0), moving (0), at design cruising speed (85 km/h)
+        ideal_x = [float(remaining_km), 85.0, 0, 0, 0]
+        ideal_tree_preds = [self._predict_single_tree(est.tree_, ideal_x) for est in self.model.estimators_]
+        theoretical_minutes = float(np.mean(ideal_tree_preds))
+        delay_minutes = max(0.0, round(mean_pred - theoretical_minutes, 2))
 
         cv = (std_pred / mean_pred) if mean_pred > 0 else 0
         confidence_score = max(60.0, min(99.0, round(100.0 - (cv * 100.0), 1)))
